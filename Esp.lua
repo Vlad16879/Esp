@@ -1,36 +1,53 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local root = character:WaitForChild("HumanoidRootPart")
 local camera = workspace.CurrentCamera
 
--- Создаем антигравитационную силу
-local bodyVelocity = Instance.new("BodyVelocity")
-bodyVelocity.MaxForce = Vector3.new(0, 0, 0) -- Сначала выключена
-bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-bodyVelocity.Parent = humanoidRootPart
-
 local isFlying = false
+local speed = 70 -- Скорость полета
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.E then -- Кнопка E для взлета
+-- Создаем физический движитель
+local bv = Instance.new("BodyVelocity")
+bv.MaxForce = Vector3.new(0, 0, 0)
+bv.Velocity = Vector3.new(0, 0, 0)
+bv.Parent = root
+
+-- Гироскоп, чтобы персонаж не кувыркался на сенсоре
+local bg = Instance.new("BodyGyro")
+bg.MaxForce = Vector3.new(0, 0, 0)
+bg.D = 500 -- Плавность поворота
+bg.Parent = root
+
+-- Функция переключения полета
+local function onFlyButton(actionName, inputState)
+    if inputState == Enum.UserInputState.Begin then
         isFlying = not isFlying
         if isFlying then
-            bodyVelocity.MaxForce = Vector3.new(4e6, 4e6, 4e6)
+            bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bg.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            print("🚀 Полет запущен!")
         else
-            bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+            bv.MaxForce = Vector3.new(0, 0, 0)
+            bg.MaxForce = Vector3.new(0, 0, 0)
+            print("⚓ Приземление...")
         end
     end
-end)
+end
+
+-- Создаем кнопку специально для тачскрина
+ContextActionService:BindAction("MobileFly", onFlyButton, true)
+ContextActionService:SetPosition("MobileFly", UDim2.new(0.5, 70, 0, 10)) -- Кнопка будет сверху справа
+ContextActionService:SetTitle("MobileFly", "FLY 🚀")
 
 RunService.RenderStepped:Connect(function()
     if isFlying then
-        -- Магия: летим туда, куда смотрит камера
-        local direction = camera.CFrame.LookVector
-        bodyVelocity.Velocity = direction * 50 -- Скорость 50
+        -- На мобилках летим ровно туда, куда направлен палец (камера)
+        bv.Velocity = camera.CFrame.LookVector * speed
+        -- Поворачиваем туловище вслед за камерой
+        bg.CFrame = camera.CFrame
     end
 end)
